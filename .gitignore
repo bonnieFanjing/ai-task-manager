@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+
+# Personal task data. Keep local SQLite databases and backups out of Git.
+data/*
+!data/.gitkeep
+.DS_Store
