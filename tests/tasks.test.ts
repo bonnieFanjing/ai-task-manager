@@ -28,6 +28,57 @@ describe('Task service', () => {
     }
   });
 
+  it('infers deadline, reminder, and schedule from concrete Inbox time', () => {
+    const { db, close } = createTestDb();
+    try {
+      const inbox = captureInbox(db, {
+        rawText: '明年5月24日上午10点在山姆买五花肉',
+        source: 'codex',
+        now: '2026-05-23T16:52:00.000Z'
+      });
+      const task = convertInboxToTask(
+        db,
+        inbox.id,
+        {
+          title: '在山姆买五花肉',
+          status: 'next',
+          deadlineAt: null,
+          reminderAt: null
+        },
+        'codex',
+        '2026-05-23T16:52:00.000Z'
+      );
+
+      expect(task.deadline_at).toBe('2027-05-24T02:00:00.000Z');
+      expect(task.reminder_at).toBe('2027-05-24T02:00:00.000Z');
+      expect(task.start_at).toBe('2027-05-24T02:00:00.000Z');
+      expect(task.status).toBe('scheduled');
+    } finally {
+      close();
+    }
+  });
+
+  it('infers natural dates when creating a task directly', () => {
+    const { db, close } = createTestDb();
+    try {
+      const task = createTask(
+        db,
+        {
+          title: '明天下午3点还信用卡'
+        },
+        'codex',
+        '2026-05-17T01:00:00.000Z'
+      );
+
+      expect(task.deadline_at).toBe('2026-05-18T07:00:00.000Z');
+      expect(task.reminder_at).toBe('2026-05-18T07:00:00.000Z');
+      expect(task.start_at).toBe('2026-05-18T07:00:00.000Z');
+      expect(task.status).toBe('scheduled');
+    } finally {
+      close();
+    }
+  });
+
   it('TC-TASK-001 completes a task and removes it from Today', () => {
     const { db, close } = createTestDb();
     try {
@@ -58,4 +109,3 @@ describe('Task service', () => {
     }
   });
 });
-

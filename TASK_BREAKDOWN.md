@@ -257,6 +257,22 @@ Deliverables:
 - Documentation.
 - Manual verification result in `PROJECT_STATUS.md`.
 
+### TASK-0503: AI delegated task scan and reminder digest
+
+Status: Completed
+
+Acceptance cases:
+
+- TC-AI-AUTO-001.
+- TC-AI-AUTO-002.
+
+Deliverables:
+
+- `ai scan` CLI command that prefixes AI-delegated tasks with `[AI]`.
+- AI scan report split into ready, future scheduled, needs-decision, and completed-today groups.
+- Reminder digest sync for daily progress and individual decision prompts.
+- LaunchAgent installer for recurring scans with Reminder sync enabled.
+
 ## Phase 6: Phone access
 
 ### TASK-0601: API auth

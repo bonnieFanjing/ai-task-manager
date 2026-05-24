@@ -71,4 +71,23 @@ describe('Recommendation service', () => {
       close();
     }
   });
+
+  it('does not recommend future scheduled tasks before their reminder time', () => {
+    const { db, close } = createTestDb();
+    try {
+      createTask(db, { title: '现在能做的事' });
+      createTask(db, {
+        title: '明年5月24日上午10点在山姆买五花肉',
+        status: 'scheduled'
+      }, 'codex', '2026-05-23T16:52:00.000Z');
+
+      const recommendations = recommendNow(db, {
+        now: '2026-05-23T16:52:00.000Z'
+      });
+
+      expect(recommendations.map((item) => item.task.title)).toEqual(['现在能做的事']);
+    } finally {
+      close();
+    }
+  });
 });

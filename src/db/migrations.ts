@@ -110,6 +110,50 @@ export const migrations: Migration[] = [
         unique(task_id, provider)
       );
     `
+  },
+  {
+    id: '0002_message_dispatch',
+    sql: `
+      create table if not exists message_recipients (
+        id text primary key,
+        display_name text not null,
+        provider text not null check (provider in ('wecom_app', 'fake')),
+        channel text not null check (channel in ('wecom_user', 'wecom_party', 'wecom_tag')),
+        external_id text not null,
+        metadata_json text,
+        created_at text not null,
+        updated_at text not null,
+        unique(provider, channel, external_id)
+      );
+
+      create index if not exists idx_message_recipients_provider_channel
+        on message_recipients(provider, channel);
+
+      create table if not exists message_outbox (
+        id text primary key,
+        task_id text references tasks(id) on delete set null,
+        recipient_id text not null references message_recipients(id),
+        provider text not null check (provider in ('wecom_app', 'fake')),
+        message_type text not null default 'text' check (message_type in ('text')),
+        body text not null,
+        scheduled_at text not null,
+        send_status text not null default 'pending' check (
+          send_status in ('pending', 'sending', 'sent', 'failed', 'canceled')
+        ),
+        external_id text,
+        attempt_count integer not null default 0,
+        last_error text,
+        created_at text not null,
+        updated_at text not null,
+        sent_at text
+      );
+
+      create index if not exists idx_message_outbox_due
+        on message_outbox(provider, send_status, scheduled_at);
+
+      create index if not exists idx_message_outbox_task
+        on message_outbox(task_id);
+    `
   }
 ];
 
@@ -148,4 +192,3 @@ export function runMigrations(db: DatabaseSync, now = new Date().toISOString()):
 
   return appliedNow;
 }
-

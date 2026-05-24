@@ -105,3 +105,37 @@ export interface Recommendation {
   score: number;
   reasons: string[];
 }
+
+export type MessageProviderName = 'wecom_app' | 'fake';
+
+export type MessageChannel = 'wecom_user' | 'wecom_party' | 'wecom_tag';
+
+export type MessageSendStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'canceled';
+
+export interface MessageRecipient {
+  id: string;
+  display_name: string;
+  provider: MessageProviderName;
+  channel: MessageChannel;
+  external_id: string;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessageOutboxItem {
+  id: string;
+  task_id: string | null;
+  recipient_id: string;
+  provider: MessageProviderName;
+  message_type: 'text';
+  body: string;
+  scheduled_at: string;
+  send_status: MessageSendStatus;
+  external_id: string | null;
+  attempt_count: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+}

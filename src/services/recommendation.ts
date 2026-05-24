@@ -3,7 +3,7 @@ import type { Recommendation, RecommendationContext, Task } from '../domain/type
 import { listTasks } from './tasks.js';
 
 function isFutureStart(task: Task, now: string): boolean {
-  return Boolean(task.start_at && task.start_at > now);
+  return Boolean(task.start_at && isFutureIso(task.start_at, now));
 }
 
 function isDueToday(task: Task, now: string): boolean {
@@ -11,7 +11,25 @@ function isDueToday(task: Task, now: string): boolean {
 }
 
 function isOverdue(task: Task, now: string): boolean {
-  return Boolean(task.deadline_at && task.deadline_at < now);
+  return Boolean(task.deadline_at && isPastIso(task.deadline_at, now));
+}
+
+function isFutureIso(value: string, now: string): boolean {
+  const valueMs = Date.parse(value);
+  const nowMs = Date.parse(now);
+  return !Number.isNaN(valueMs) && !Number.isNaN(nowMs) && valueMs > nowMs;
+}
+
+function isPastIso(value: string, now: string): boolean {
+  const valueMs = Date.parse(value);
+  const nowMs = Date.parse(now);
+  return !Number.isNaN(valueMs) && !Number.isNaN(nowMs) && valueMs < nowMs;
+}
+
+function isFutureScheduled(task: Task, now: string): boolean {
+  if (task.status !== 'scheduled') return false;
+  const visibleAt = task.start_at ?? task.reminder_at ?? task.deadline_at;
+  return Boolean(visibleAt && isFutureIso(visibleAt, now));
 }
 
 function normalizeLocation(value: string): string {
@@ -48,6 +66,7 @@ export function recommendNow(db: DatabaseSync, context: RecommendationContext = 
     if (['completed', 'canceled', 'trash'].includes(task.status)) return false;
     if (!context.includeWaiting && (task.status === 'waiting' || task.waiting_for)) return false;
     if (isFutureStart(task, now) && !isDueToday(task, now) && !isOverdue(task, now)) return false;
+    if (isFutureScheduled(task, now) && !isDueToday(task, now) && !isOverdue(task, now)) return false;
     return true;
   });
 

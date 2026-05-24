@@ -29,6 +29,8 @@ Implemented:
 - "What should I do now?" recommendation engine.
 - AI suggestion storage and explicit acceptance flow.
 - Reminder sync framework with a fake provider for regression tests.
+- AI-delegated task scan with `[AI]` labeling, progress digest, and decision reminders.
+- Message dispatch outbox for scheduling task assignments through 企业微信 self-built app messages.
 - Token-protected HTTP API.
 - CLI for agent-friendly task operations.
 - Web UI for Inbox, processing, Today, and recommendations.
@@ -109,6 +111,36 @@ Recommend now:
 npm run task -- recommend --commute --minutes 20
 npm run task -- recommend --computer --minutes 45 --location home
 ```
+
+Scan AI-delegated tasks and optionally sync active task reminders plus Reminder digests:
+
+```bash
+npm run task -- ai scan
+npm run task -- ai scan --sync-reminders --list "AI Task Manager"
+npm run ai:scan:install
+```
+
+Sync every active task with `reminder_at`, including overdue unfinished tasks:
+
+```bash
+npm run task -- reminder sync-active --list "AI Task Manager"
+```
+
+Queue and dispatch 企业微信 task messages:
+
+```bash
+npm run task -- message recipient add "Alice" --wecom-user alice.userid
+npm run task -- message queue <task-id> --to <recipient-id> --at 2026-05-24T10:00:00.000Z
+npm run task -- message outbox
+npm run task -- message dispatch
+npm run message:dispatch:install
+```
+
+Use `--fake` on recipient creation and dispatch for local dry-run testing. Real
+dispatch uses 企业微信自建应用 credentials from `WECOM_CORP_ID`,
+`WECOM_AGENT_SECRET`, and `WECOM_AGENT_ID`. The integration sends through the
+official 企业微信 application message API; it does not automate the personal
+WeChat desktop client or bypass WeChat interaction limits.
 
 ## API examples
 

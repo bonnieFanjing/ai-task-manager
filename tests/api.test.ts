@@ -75,4 +75,43 @@ describe('API', () => {
       close();
     }
   });
+
+  it('queues and dispatches fake messages through the API', async () => {
+    const { db, close } = createTestDb();
+    try {
+      const app = createApp(db);
+      const task = await request(app)
+        .post('/api/tasks')
+        .send({ task: { title: '同步项目状态' } })
+        .expect(201);
+      const recipient = await request(app)
+        .post('/api/messages/recipients')
+        .send({
+          displayName: 'Alice',
+          provider: 'fake',
+          channel: 'wecom_user',
+          externalId: 'alice'
+        })
+        .expect(201);
+      const queued = await request(app)
+        .post('/api/messages/outbox')
+        .send({
+          taskId: task.body.task.id,
+          recipientId: recipient.body.recipient.id,
+          scheduledAt: '2026-05-17T10:00:00.000Z'
+        })
+        .expect(201);
+
+      const dispatched = await request(app)
+        .post('/api/messages/dispatch')
+        .send({ provider: 'fake', now: '2026-05-17T10:00:00.000Z' })
+        .expect(200);
+
+      expect(queued.body.item.send_status).toBe('pending');
+      expect(dispatched.body.results[0].item.id).toBe(queued.body.item.id);
+      expect(dispatched.body.results[0].status).toBe('sent');
+    } finally {
+      close();
+    }
+  });
 });

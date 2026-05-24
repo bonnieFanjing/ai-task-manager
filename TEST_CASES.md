@@ -343,6 +343,47 @@ Automation:
 
 - Mock failure test.
 
+### TC-AI-AUTO-001: AI delegated tasks are scanned and labeled
+
+Status: Automated
+
+Steps:
+
+1. Create active tasks with `delegated_to = 'ai'`.
+2. Run AI scan.
+
+Expected:
+
+- Active AI-delegated task titles are prefixed with `[AI]` if missing.
+- Already labeled tasks are not double-prefixed.
+- Scan output separates ready tasks, future scheduled tasks, and tasks needing user decision.
+- Label changes create `task_events` rows.
+
+Automation:
+
+- `tests/aiAutomation.test.ts`.
+
+### TC-AI-AUTO-002: AI scan creates progress and decision reminders
+
+Status: Automated
+
+Steps:
+
+1. Create one ready AI task, one completed AI task, and one AI task needing user decision.
+2. Run AI scan reminder sync with a fake provider.
+
+Expected:
+
+- A daily AI progress reminder is created with completed, ready, future, and decision counts.
+- Completed-today AI tasks appear in the reminder notes.
+- Each decision task gets an individual reminder.
+- Reminder upsert uses stable IDs so repeated scans update existing reminders.
+- If one Reminder upsert fails, the scan returns failed sync status instead of aborting the whole report.
+
+Automation:
+
+- `tests/aiAutomation.test.ts`.
+
 ## G. Reminder sync
 
 ### TC-REM-001: Reminder sync creates Apple Reminder mapping
@@ -520,4 +561,3 @@ Expected:
 Automation:
 
 - Migration test after second migration exists.
-

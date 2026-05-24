@@ -163,6 +163,19 @@ Then:
 
 - All commands pass, or the failure is documented in `PROJECT_STATUS.md`.
 
+### A10: AI delegated task scan and digest
+
+Given tasks are delegated to AI.
+
+When the AI scan runs.
+
+Then:
+
+- Missing `[AI]` title prefixes are added.
+- Tasks are grouped into ready, future scheduled, decision-needed, and completed-today buckets.
+- A daily Reminder digest summarizes progress.
+- Decision-needed tasks get individual Reminder prompts.
+
 ## Manual QA checklist
 
 Before using with real personal data:
@@ -177,4 +190,3 @@ Before using with real personal data:
 - Confirm completed task disappears from Today.
 - Trigger AI suggestion with a mock or manual response.
 - Confirm raw Inbox text remains unchanged.
-

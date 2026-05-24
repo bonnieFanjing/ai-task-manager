@@ -101,4 +101,4 @@ For MVP:
 - Add a reminder sync status field.
 - Build a manual command first: sync selected task to Apple Reminders.
 - Later add automatic sync for tasks with real reminders.
-
+- Add a recurring AI scan that creates a daily AI progress digest and individual decision prompts in Apple Reminders.

@@ -4,6 +4,7 @@ import { nowIso } from '../db/connection.js';
 import type { Task, TaskInput, TaskStatus } from '../domain/types.js';
 import { getInboxItem, updateInboxStatus } from './inbox.js';
 import { recordTaskEvent, withTransaction } from './events.js';
+import { enrichTaskInputWithNaturalDates } from './naturalDates.js';
 
 type Row = Record<string, unknown>;
 
@@ -72,8 +73,10 @@ export function createTask(
   db: DatabaseSync,
   input: TaskInput & { sourceInboxId?: string | null },
   createdBy = 'api',
-  at = nowIso()
+  at = nowIso(),
+  sourceTexts: string[] = []
 ): Task {
+  const normalizedInput = enrichTaskInputWithNaturalDates(input, sourceTexts, at);
   const id = randomUUID();
   db.prepare(
     `
@@ -86,31 +89,31 @@ export function createTask(
     `
   ).run(
     id,
-    input.title.trim(),
-    input.notes ?? null,
-    input.sourceInboxId ?? null,
-    input.status ?? 'next',
-    input.projectId ?? null,
-    input.importance ?? 3,
-    input.urgency ?? 3,
-    input.priority ?? 'medium',
-    input.deadlineAt ?? null,
-    input.startAt ?? null,
-    input.reminderAt ?? null,
-    input.repeatRule ?? null,
-    input.estimatedMinutes ?? null,
-    input.energyLevel ?? null,
-    input.delegatedTo ?? null,
-    input.waitingFor ?? null,
+    normalizedInput.title.trim(),
+    normalizedInput.notes ?? null,
+    normalizedInput.sourceInboxId ?? null,
+    normalizedInput.status ?? 'next',
+    normalizedInput.projectId ?? null,
+    normalizedInput.importance ?? 3,
+    normalizedInput.urgency ?? 3,
+    normalizedInput.priority ?? 'medium',
+    normalizedInput.deadlineAt ?? null,
+    normalizedInput.startAt ?? null,
+    normalizedInput.reminderAt ?? null,
+    normalizedInput.repeatRule ?? null,
+    normalizedInput.estimatedMinutes ?? null,
+    normalizedInput.energyLevel ?? null,
+    normalizedInput.delegatedTo ?? null,
+    normalizedInput.waitingFor ?? null,
     at,
     at
   );
 
-  insertRequirements(db, id, input);
+  insertRequirements(db, id, normalizedInput);
   recordTaskEvent(db, {
     taskId: id,
     eventType: 'created',
-    newValue: { title: input.title, sourceInboxId: input.sourceInboxId ?? null },
+    newValue: { title: normalizedInput.title, sourceInboxId: normalizedInput.sourceInboxId ?? null },
     createdBy,
     at
   });
@@ -140,7 +143,8 @@ export function convertInboxToTask(
         sourceInboxId: inboxId
       },
       createdBy,
-      at
+      at,
+      [inbox.raw_text]
     );
 
     updateInboxStatus(db, inboxId, 'processed', at);
@@ -297,6 +301,24 @@ export function listTodayTasks(db: DatabaseSync, now = nowIso()): Task[] {
     .map((row) => toTask(row as Row));
 }
 
+export function listActiveTasksWithReminders(db: DatabaseSync): Task[] {
+  return db
+    .prepare(
+      `
+        select tasks.*, task_requirements.*
+        from tasks
+        left join task_requirements on task_requirements.task_id = tasks.id
+        where tasks.deleted_at is null
+          and tasks.status not in ('completed', 'canceled', 'trash')
+          and tasks.reminder_at is not null
+          and trim(tasks.reminder_at) != ''
+        order by tasks.reminder_at asc, tasks.importance desc, tasks.urgency desc, tasks.created_at asc
+      `
+    )
+    .all()
+    .map((row) => toTask(row as Row));
+}
+
 export function listAiDelegatedTasks(db: DatabaseSync): Task[] {
   return db
     .prepare(
@@ -321,5 +343,24 @@ export function listAiDelegatedTasks(db: DatabaseSync): Task[] {
       `
     )
     .all()
+    .map((row) => toTask(row as Row));
+}
+
+export function listCompletedAiDelegatedTasksSince(db: DatabaseSync, since: string): Task[] {
+  return db
+    .prepare(
+      `
+        select tasks.*, task_requirements.*
+        from tasks
+        left join task_requirements on task_requirements.task_id = tasks.id
+        where tasks.deleted_at is null
+          and tasks.status = 'completed'
+          and tasks.delegated_to = 'ai'
+          and tasks.completed_at is not null
+          and tasks.completed_at >= ?
+        order by tasks.completed_at desc, tasks.created_at desc
+      `
+    )
+    .all(since)
     .map((row) => toTask(row as Row));
 }

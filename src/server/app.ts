@@ -1,9 +1,24 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAiSuggestion, acceptAiSuggestionForTask } from '../services/aiSuggestions.js';
+import { scanAiTasks, syncAiScanReminders } from '../services/aiAutomation.js';
 import { captureInbox, listInbox, updateInboxStatus } from '../services/inbox.js';
+import {
+  createMessageRecipient,
+  dispatchDueMessages,
+  FakeMessageProvider,
+  listMessageOutbox,
+  listMessageRecipients,
+  queueTaskMessage,
+  WeComAppMessageProvider
+} from '../services/messages.js';
 import { recommendNow } from '../services/recommendation.js';
-import { FakeReminderProvider, syncTaskReminder } from '../services/reminders.js';
+import {
+  AppleRemindersProvider,
+  FakeReminderProvider,
+  syncActiveTaskReminders,
+  syncTaskReminder
+} from '../services/reminders.js';
 import { completeTask, convertInboxToTask, createTask, listTodayTasks } from '../services/tasks.js';
 
 function requireAuth(req: Request, res: Response, next: NextFunction): void {
@@ -102,11 +117,99 @@ export function createApp(db: DatabaseSync): express.Express {
   });
 
   app.post(
+    '/api/ai/scan',
+    asyncHandler(async (req, res) => {
+      const report = scanAiTasks(db, {
+        now: req.body.now,
+        readyLimit: req.body.readyLimit,
+        labelPrefix: req.body.labelPrefix,
+        createdBy: req.body.createdBy ?? 'api'
+      });
+      if (!req.body.syncReminders) {
+        res.json({ report });
+        return;
+      }
+
+      const provider =
+        req.body.provider === 'fake'
+          ? new FakeReminderProvider()
+          : new AppleRemindersProvider(req.body.listName);
+      const taskReminders = await syncActiveTaskReminders(db, provider);
+      const reminders = await syncAiScanReminders(report, provider, {
+        now: req.body.now,
+        dailyAt: req.body.dailyAt,
+        decisionAt: req.body.decisionAt
+      });
+      res.json({ report, taskReminders, reminders });
+    })
+  );
+
+  app.post(
+    '/api/reminders/sync-active',
+    asyncHandler(async (req, res) => {
+      const provider =
+        req.body.provider === 'fake'
+          ? new FakeReminderProvider()
+          : new AppleRemindersProvider(req.body.listName);
+      const syncs = await syncActiveTaskReminders(db, provider);
+      res.json({ syncs });
+    })
+  );
+
+  app.post(
     '/api/tasks/:id/sync-reminder',
     asyncHandler(async (req, res) => {
-      const provider = new FakeReminderProvider();
+      const provider =
+        req.body.provider === 'fake'
+          ? new FakeReminderProvider()
+          : new AppleRemindersProvider(req.body.listName);
       const sync = await syncTaskReminder(db, String(req.params.id), provider);
       res.json({ sync });
+    })
+  );
+
+  app.post('/api/messages/recipients', (req, res) => {
+    const recipient = createMessageRecipient(db, {
+      displayName: String(req.body.displayName ?? req.body.display_name ?? ''),
+      provider: req.body.provider ?? 'wecom_app',
+      channel: req.body.channel,
+      externalId: String(req.body.externalId ?? req.body.external_id ?? ''),
+      metadata: req.body.metadata
+    });
+    res.status(201).json({ recipient });
+  });
+
+  app.get('/api/messages/recipients', (_req, res) => {
+    res.json({ recipients: listMessageRecipients(db) });
+  });
+
+  app.post('/api/messages/outbox', (req, res) => {
+    const item = queueTaskMessage(db, {
+      taskId: req.body.taskId ?? req.body.task_id,
+      recipientId: String(req.body.recipientId ?? req.body.recipient_id ?? ''),
+      body: req.body.body,
+      scheduledAt: req.body.scheduledAt ?? req.body.scheduled_at,
+      provider: req.body.provider
+    });
+    res.status(201).json({ item });
+  });
+
+  app.get('/api/messages/outbox', (req, res) => {
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 50;
+    res.json({ items: listMessageOutbox(db, Number.isFinite(limit) ? limit : 50) });
+  });
+
+  app.post(
+    '/api/messages/dispatch',
+    asyncHandler(async (req, res) => {
+      const provider =
+        req.body.provider === 'fake' ? new FakeMessageProvider() : new WeComAppMessageProvider();
+      const results = await dispatchDueMessages(db, provider, {
+        now: req.body.now,
+        limit: req.body.limit,
+        createdBy: req.body.createdBy ?? 'api'
+      });
+      res.json({ results });
     })
   );
 

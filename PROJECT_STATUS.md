@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-05-17
+Last updated: 2026-05-24
 
 ## Current phase
 
@@ -47,6 +47,8 @@ The project is ready for user-level manual acceptance testing.
 - Recommendation engine v1.
 - AI suggestion storage and explicit acceptance flow.
 - Reminder sync framework with fake provider.
+- AI-delegated task scan with `[AI]` labeling, ready/future/decision/completed progress groups, CLI/API entry points, and Reminder digest sync.
+- LaunchAgent installer for recurring AI scans that sync daily progress and decision reminders to Apple Reminders.
 - CLI entry for Inbox, Today, and recommendation.
 - HTTP API for Inbox, tasks, recommendations, AI suggestions, and reminder sync.
 - Web UI for Inbox, processing, Today, and recommendations.
@@ -55,6 +57,7 @@ The project is ready for user-level manual acceptance testing.
 ## Not completed / manual acceptance still needed
 
 - Real Apple Reminders/iPhone notification sync. Fake provider is implemented and tested; real provider is still a later slice.
+- Real recurring AI scan and iPhone notification delivery still need manual verification on the Mac/iPhone pair.
 - Tailscale phone access manual verification.
 - Live AI provider token integration. Current MVP stores AI suggestions and supports acceptance, but normal tests do not call a live model.
 
@@ -104,6 +107,32 @@ Manual acceptance focus:
   - Expanded README with purpose, usage, API examples, deployment pointer, and data privacy note.
   - Tightened `.gitignore` so local SQLite databases and backups under `data/` are not committed.
   - Added short code comments for database path isolation and transparent recommendation scoring.
+
+### 2026-05-24
+
+- Implemented TASK-0503: AI delegated task scan and reminder digest.
+- Acceptance coverage:
+  - TC-AI-AUTO-001.
+  - TC-AI-AUTO-002.
+- Added `scanAiTasks`/`syncAiScanReminders` service behavior for `[AI]` labeling, ready queue, future scheduled queue, decision queue, completed-today progress, daily Reminder digest, and individual decision reminders.
+- Reminder digest sync now returns per-reminder `synced`/`failed` status instead of aborting the whole scan when Apple Reminders is blocked.
+- Added CLI/API access for AI scan and Reminder sync.
+- Added launchd scripts:
+  - `scripts/ai-scan-reminders.sh`
+  - `scripts/install-ai-scan-launchd.sh`
+- Regression passed:
+  - `npm run lint`
+  - `npm test`
+  - `npm run db:check`
+  - `npm run build`
+  - `npm run test:e2e`
+  - `bash -n scripts/ai-scan-reminders.sh scripts/install-ai-scan-launchd.sh`
+
+Known issues:
+
+- The recurring LaunchAgent has not been installed in this session.
+- Real Apple Reminders delivery is currently blocked: direct `osascript` access to Reminders timed out, so the code can report Reminder sync failures cleanly but cannot create iPhone-visible reminders until macOS Reminders automation responds.
+- The scan queues AI tasks and creates progress/decision reminders; actual task execution is still performed by Codex sessions, not by a background LLM worker.
 
 ## Files changed in MVP implementation
 

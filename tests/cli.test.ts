@@ -53,4 +53,30 @@ describe('CLI', () => {
     expect(listed).toContain('帮我做个算账的工具');
     expect(listed).toContain('AI协作: 代码实现/工具原型');
   });
+
+  it('can queue and dispatch a fake message', () => {
+    const dbPath = join(mkdtempSync(join(tmpdir(), 'ai-task-cli-')), 'test.sqlite');
+    const added = runCli(dbPath, ['inbox', 'add', '提醒 Alice 看项目状态']);
+    const inboxId = added.split('\t')[0];
+    const converted = runCli(dbPath, ['inbox', 'convert', inboxId, '提醒 Alice 看项目状态']);
+    const taskId = converted.split('\t')[0];
+    const recipient = runCli(dbPath, [
+      'message',
+      'recipient',
+      'add',
+      'Alice',
+      '--wecom-user',
+      'alice',
+      '--fake'
+    ]);
+    const recipientId = recipient.split('\t')[0];
+
+    const queued = runCli(dbPath, ['message', 'queue', taskId, '--to', recipientId]);
+    const outboxId = queued.split('\t')[0];
+    const dispatched = runCli(dbPath, ['message', 'dispatch', '--fake']);
+
+    expect(dispatched).toContain(outboxId);
+    expect(dispatched).toContain('sent');
+    expect(dispatched).toContain(`fake-${outboxId}`);
+  });
 });
